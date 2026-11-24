@@ -378,7 +378,8 @@ p{margin:0}
 /* Apparition au défilement */
 .rv{opacity:0;transform:translateY(28px);transition:opacity .9s var(--ease),transform .9s var(--ease);transition-delay:var(--d,0s)}
 .rv.is-in{opacity:1;transform:none}
-.hero .rv{transform:translateY(18px)}
+.hero .rv{opacity:1;transform:none;transition:none;animation:heroIn .8s var(--ease) both;animation-delay:var(--d,0s)}
+@keyframes heroIn{from{opacity:0;transform:translateY(18px)}}
 
 /* Tablette */
 @media (max-width:1100px){
