@@ -1,6 +1,7 @@
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  let lastW = innerWidth;
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const root = document.documentElement;
 
@@ -79,11 +80,34 @@
   const stop = () => { drag = false; };
   view.addEventListener("pointerup", stop); view.addEventListener("pointercancel", stop);
   range.addEventListener("input", () => { view.classList.add("is-used"); setPos(+range.value); });
-  $$(".ba__tab").forEach(t => t.addEventListener("click", () => {
-    $$(".ba__tab").forEach(x => x.setAttribute("aria-selected", String(x === t)));
+  // Photos préchargées à l'approche de la section, puis changées ensemble une fois prêtes (pas de décalage)
+  const baSize = innerWidth < 900 ? 800 : 1600, baTabs = $$(".ba__tab");
+  const baUrl = n => `img/${n}-${baSize}.webp`;
+  const baCache = {};
+  const baLoad = n => baCache[n] || (baCache[n] = new Promise(ok => {
+    const im = new Image();
+    im.onload = im.onerror = () => (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(ok);
+    im.src = baUrl(n);
+  }));
+  $("#baAfter").src = baUrl(baTabs[0].dataset.a);
+  $("#baBefore").src = baUrl(baTabs[0].dataset.b);
+  const pio = new IntersectionObserver(es => {
+    if (!es[0].isIntersecting) return;
+    pio.disconnect();
+    baTabs.forEach(t => { baLoad(t.dataset.a); baLoad(t.dataset.b); });
+  }, { rootMargin: "800px 0px" });
+  pio.observe(view);
+  let baReq = 0;
+  baTabs.forEach(t => t.addEventListener("click", async () => {
+    baTabs.forEach(x => x.setAttribute("aria-selected", String(x === t)));
+    const req = ++baReq;
+    view.style.opacity = ".85";
+    await Promise.all([baLoad(t.dataset.a), baLoad(t.dataset.b)]);
+    if (req !== baReq) return; // un autre onglet a été choisi entre-temps
     const a = $("#baAfter"), b = $("#baBefore");
-    a.src = `img/${t.dataset.a}-1600.webp`; a.alt = `Après : ${t.dataset.alt} refait`;
-    b.src = `img/${t.dataset.b}-1600.webp`; b.alt = `Avant : ${t.dataset.alt} d'origine`;
+    a.src = baUrl(t.dataset.a); a.alt = `Après : ${t.dataset.alt} refait`;
+    b.src = baUrl(t.dataset.b); b.alt = `Avant : ${t.dataset.alt} d'origine`;
+    view.style.opacity = "";
     setPos(50);
   }));
   // Petit aller-retour du curseur la première fois qu'on voit la section, pour montrer qu'il bouge
@@ -241,6 +265,10 @@
   const mbar = $("#mbar");
   new IntersectionObserver(([e]) => mbar.classList.toggle("is-on", !e.isIntersecting && e.boundingClientRect.top < 0)).observe($("#heroCta"));
 
+  // Hauteur réelle du bandeau de confiance, pour qu'il tienne dans le premier écran sur ordinateur
+  const trustH = () => root.style.setProperty("--trust-h", $(".trust").offsetHeight + "px");
+  trustH();
+  addEventListener("resize", () => { if (innerWidth !== lastW) { lastW = innerWidth; trustH(); } });
   $("#year").textContent = new Date().getFullYear();
   onScroll();
 })();
